@@ -1,0 +1,60 @@
+name: Test ClaudeCode Integration
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+  checks: read
+
+jobs:
+  test-claudecode:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    
+    - name: Install Claude CLI
+      run: |
+        npm install -g @anthropic-ai/claude-code
+    
+    - name: Install dependencies
+      run: |
+        pip install pytest pytest-cov
+        pip install -r claudecode/requirements.txt
+    
+    - name: Run ClaudeCode unit tests
+      run: |
+        export PYTHONPATH="${PYTHONPATH}:${PWD}"
+        pytest claudecode -v --cov=claudecode --cov-report=term-missing
+    
+    - name: Install Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+    
+    - name: Install script dependencies
+      run: |
+        cd scripts
+        bun install
+    
+    - name: Run comment script tests
+      run: |
+        cd scripts
+        bun test
