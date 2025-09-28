@@ -169,8 +169,125 @@ class GitHubActionClient:
                     continue
 
             filtered_sections.append(section)
-            
+        
         return ''.join(filtered_sections)
+
+    # -------------------- Commits APIs for metrics --------------------
+    def list_commits(
+        self,
+        repo_name: str,
+        since_iso: str,
+        until_iso: str,
+        branch: Optional[str] = None,
+        author: Optional[str] = None,
+        per_page: int = 100,
+        max_pages: int = 50
+    ) -> List[Dict[str, Any]]:
+        """List commits in a time window with optional branch/author filters (paginated)."""
+        params = {
+            'since': since_iso,
+            'until': until_iso,
+            'per_page': per_page
+        }
+        if branch:
+            params['sha'] = branch
+        if author:
+            params['author'] = author
+        commits: List[Dict[str, Any]] = []
+        page = 1
+        while page <= max_pages:
+            params['page'] = page
+            url = f"https://api.github.com/repos/{repo_name}/commits"
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            batch = response.json()
+            if not batch:
+                break
+            commits.extend(batch)
+            page += 1
+        return commits
+
+    def get_commit_detail(self, repo_name: str, sha: str) -> Dict[str, Any]:
+        """Get a single commit detail including file-level additions/deletions/patch."""
+        url = f"https://api.github.com/repos/{repo_name}/commits/{sha}"
+        response = requests.get(url, headers=self.headers)
+        response.raise_for_status()
+        data = response.json()
+        # Filter files by excluded directories
+        files = data.get('files') or []
+        filtered_files = []
+        for f in files:
+            filename = f.get('filename', '')
+            if not self._is_excluded(filename):
+                filtered_files.append(f)
+        data['files'] = filtered_files
+        return data
+
+    # -------------------- Pull Requests APIs for metrics --------------------
+    def list_pull_requests(
+        self,
+        repo_name: str,
+        state: str = 'all',
+        per_page: int = 100,
+        max_pages: int = 50,
+        author: Optional[str] = None,
+        since_iso: Optional[str] = None,
+        until_iso: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """List pull requests with optional author and time window filtering.
+
+        Filters by created_at within [since, until) if both provided.
+        """
+        params = {
+            'state': state,
+            'per_page': per_page,
+            'sort': 'created',
+            'direction': 'asc'
+        }
+        prs: List[Dict[str, Any]] = []
+        page = 1
+
+        # Parse time bounds to datetime for local filtering
+        from datetime import datetime, timezone
+        def _parse_iso(dt_str: str) -> datetime:
+            if dt_str.endswith('Z'):
+                dt_str = dt_str[:-1] + "+00:00"
+            return datetime.fromisoformat(dt_str).astimezone(timezone.utc)
+
+        since_dt = _parse_iso(since_iso) if since_iso else None
+        until_dt = _parse_iso(until_iso) if until_iso else None
+
+        while page <= max_pages:
+            params['page'] = page
+            url = f"https://api.github.com/repos/{repo_name}/pulls"
+            response = requests.get(url, headers=self.headers, params=params)
+            response.raise_for_status()
+            batch = response.json()
+            if not batch:
+                break
+
+            for pr in batch:
+                # Author filter (login)
+                if author:
+                    user = pr.get('user') or {}
+                    login = (user.get('login') or '').lower()
+                    if login != author.lower():
+                        continue
+                # Time window filter on created_at
+                if since_dt or until_dt:
+                    created_at = pr.get('created_at')
+                    if not created_at:
+                        continue
+                    # Example format: 2025-09-12T10:20:30Z
+                    c = _parse_iso(created_at)
+                    if since_dt and c < since_dt:
+                        continue
+                    if until_dt and not (c < until_dt):
+                        continue
+                prs.append(pr)
+
+            page += 1
+        return prs
 
 class SimpleClaudeRunner:
     """Simplified Claude Code runner for GitHub Actions."""

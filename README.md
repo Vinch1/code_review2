@@ -166,3 +166,14 @@ For issues or questions:
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+## Backend API (Metrics & Summaries)
+
+This repository also includes a small Flask backend that exposes:
+- Commit stats by author and time bucket
+- PR stats by author and time bucket
+- LLM‑powered commit summaries (window) and grouped by author × day
+
+See docs/metrics_api.md for setup, endpoints, and curl examples.
