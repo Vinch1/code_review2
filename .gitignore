@@ -16,6 +16,7 @@ security_report.*
 venv/
 env/
 .venv/
+Backend/settings/.env
 
 # Debug files
 claudecode/claudecode-prompt.txt
