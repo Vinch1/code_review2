@@ -15,6 +15,7 @@ def audit_analysis(item_data) -> Dict[str, Any]:
     custom_filtering_instructions = items.filter_instruction
     try:
         findings_filter = initialize_findings_filter(custom_filtering_instructions)
+        logger.info("findings_filter init success")
     except Exception as e:
         logger.error(json.dumps({'error': str(e)}))
 
@@ -23,6 +24,7 @@ def audit_analysis(item_data) -> Dict[str, Any]:
     try:
         pr_diff = github_client.get_pr_diff(repo_name, pr_number)
         pr_data = github_client.get_pr_data(repo_name, pr_number)
+        # logger.info(f"pr_data: {pr_data}")
         if pr_diff and pr_data:
             logger.info("get pr successs")
     except Exception as e:
@@ -30,6 +32,8 @@ def audit_analysis(item_data) -> Dict[str, Any]:
 
     prompt = get_security_audit_prompt(pr_data, pr_diff, custom_scan_instructions=custom_scan_instructions)
     success, error_msg, results = claude_runner.run_security_audit(prompt)
+    logger.info(f"success?: {success}, error_msg: {error_msg}")
+    logger.info(f"results from run_security_audit: {results}")
 
     if not success and error_msg == "PROMPT_TOO_LONG":
         logger.error(f"[Info] Prompt too long, retrying without diff. Original prompt length: {len(prompt)} characters", file=sys.stderr)
@@ -41,6 +45,7 @@ def audit_analysis(item_data) -> Dict[str, Any]:
 
     # Filter findings to reduce false positives
     original_findings = results.get('findings', [])
+    logger.info(f"Original findings: {original_findings}")
     # Prepare PR context for better filtering
     pr_context = {
         'repo_name': repo_name,
