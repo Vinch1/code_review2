@@ -1,5 +1,11 @@
+import os, sys, json
+pwdir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(pwdir, ".."))
+sys.path.insert(0, os.path.join(pwdir, "..", ".."))
+from utils.log import logger
 from typing import Dict, Any, List, Tuple
 from src.init_github_client import GitHubActionClient
+
 def apply_findings_filter(findings_filter, original_findings: List[Dict[str, Any]], 
                          pr_context: Dict[str, Any], github_client: GitHubActionClient) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """Apply findings filter to reduce false positives.
@@ -17,10 +23,12 @@ def apply_findings_filter(findings_filter, original_findings: List[Dict[str, Any
     )
     
     if filter_success:
+        logger.info(f"filter_success! filter_results: {filter_results}")
         kept_findings = filter_results.get('filtered_findings', [])
         excluded_findings = filter_results.get('excluded_findings', [])
         analysis_summary = filter_results.get('analysis_summary', {})
     else:
+        logger.error(f"filter_failed! filter_results: {filter_results}")
         # Filtering failed, keep all findings
         kept_findings = original_findings
         excluded_findings = []

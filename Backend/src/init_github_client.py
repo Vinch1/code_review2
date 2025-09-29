@@ -194,9 +194,11 @@ class SimpleClaudeRunner:
             NUM_RETRIES = 3
             for attempt in range(NUM_RETRIES):
                 success, response_text, error_msg = self.client.call_with_retry(prompt)
+                logger.info(f"llm raw output: {response_text}")
                 if not success:
                     logger.error(f"Runner Error calling API: {error_msg}")
                 success, parsed_result = parse_json_with_fallbacks(response_text, "Runner Code output")
+                logger.info(f"parsed result: {parsed_result}")
                 if success:
                     # Check for "Prompt is too long" error that should trigger retry without diff
                     if (isinstance(parsed_result, dict) and 
@@ -213,8 +215,9 @@ class SimpleClaudeRunner:
                         continue  # Retry
                     
                     # Extract security findings
-                    parsed_results = self._extract_security_findings(parsed_result)
-                    return True, "", parsed_results
+                    # parsed_results = self._extract_security_findings(parsed_result)
+                    # logger.info(f"Security findings: {parsed_results}")
+                    return True, "", parsed_result
                 else:
                     return False, "Failed to parse API output", {}
             
@@ -227,11 +230,13 @@ class SimpleClaudeRunner:
         if isinstance(claude_output, dict):
             # Only accept Claude Code wrapper with result field
             # Direct format without wrapper is not supported
+            logger.info(f"keys in claude_output: {claude_output.keys()}")
             if 'result' in claude_output:
                 result_text = claude_output['result']
                 if isinstance(result_text, str):
                     # Try to extract JSON from the result text
                     success, result_json = parse_json_with_fallbacks(result_text, "Claude result text")
+                    logger.info(f"_extract_findings, success: {success}, result_json: {result_json}")
                     if success and result_json and 'findings' in result_json:
                         return result_json
         
