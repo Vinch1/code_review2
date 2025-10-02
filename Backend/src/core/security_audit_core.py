@@ -5,6 +5,9 @@ sys.path.insert(0, os.path.join(pwdir, "..", ".."))
 from utils.log import logger
 from typing import Dict, Any, List, Tuple
 from src.init_github_client import GitHubActionClient
+from src.init_llm_client import LLMClient
+from src.prompts.security_audit_prompt import get_if_security_prompt
+from utils.json_parser import parse_json_with_fallbacks, parse_json_markdown
 
 def apply_findings_filter(findings_filter, original_findings: List[Dict[str, Any]], 
                          pr_context: Dict[str, Any], github_client: GitHubActionClient) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
@@ -68,3 +71,21 @@ def _is_finding_in_excluded_directory(finding: Dict[str, Any], github_client: Gi
         return False
     
     return github_client._is_excluded(file_path)
+
+def is_security_related(repo_name, pr_number)->Tuple[bool, dict]:
+    github_client = GitHubActionClient()
+    llm_client = LLMClient()
+    pr_diff = github_client.get_pr_diff(repo_name, pr_number)
+    # whether pr is about security
+    prompt = get_if_security_prompt(pr_diff)
+    success, response_text, error_msg = llm_client.call_with_retry(prompt)
+    if not success:
+        logger.error(f"Runner Error calling API: {error_msg}")
+    logger.info(f"Runner response: {response_text}")
+    parsed_result = parse_json_markdown(response_text)
+    # if not success:
+    #     logger.error(f"Runner Error parsing is_security_related output")
+    logger.info(f"is_security json output: {parsed_result}")
+    
+    # return success, parsed_result
+    return parsed_result
