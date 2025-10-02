@@ -174,3 +174,62 @@ Begin your analysis now. Use the repository exploration tools to understand the 
 
 Your final reply must contain the JSON and nothing else. You should not reply again after outputting the JSON.
 """
+
+def get_if_security_prompt(pr_diff) -> str:
+  return f"""
+You are a senior security engineer detecting whether pr diff content is related to security categories.
+
+SECURITY CATEGORIES TO EXAMINE:
+
+**Input Validation Vulnerabilities:**
+- SQL injection via unsanitized user input
+- Command injection in system calls or subprocesses
+- XXE injection in XML parsing
+- Template injection in templating engines
+- NoSQL injection in database queries
+- Path traversal in file operations
+
+**Authentication & Authorization Issues:**
+- Authentication bypass logic
+- Privilege escalation paths
+- Session management flaws
+- JWT token vulnerabilities
+- Authorization logic bypasses
+
+**Crypto & Secrets Management:**
+- Hardcoded API keys, passwords, or tokens
+- Weak cryptographic algorithms or implementations
+- Improper key storage or management
+- Cryptographic randomness issues
+- Certificate validation bypasses
+
+**Injection & Code Execution:**
+- Remote code execution via deseralization
+- Pickle injection in Python
+- YAML deserialization vulnerabilities
+- Eval injection in dynamic code execution
+- XSS vulnerabilities in web applications (reflected, stored, DOM-based)
+
+**Data Exposure:**
+- Sensitive data logging or storage
+- PII handling violations
+- API endpoint data leakage
+- Debug information exposure
+
+PR DIFF CONTENT:
+```
+{pr_diff}
+```
+Review the complete diff above. This contains all code changes in the PR.
+
+If the pr diff content is related to security categories, set is_security to True, otherwise set it to False.
+If is_security is True, set reason to the security categories that the pr diff content is related to.
+If is_security is False, set reason to the reason why the pr diff content is not related to security categories.
+
+You MUST output detection result as json format:
+{{
+  "is_security": True,
+  "reason": "The pr diff content is related to security categories."
+}}
+Your final reply must contain the JSON and nothing else. You should not reply again after outputting the JSON.
+"""

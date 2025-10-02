@@ -81,3 +81,33 @@ def parse_json_with_fallbacks(text, error_context=""):
     
     logger.error(f"{error_msg}. Raw output: {repr(text)}")
     return False, {"error": f"Invalid JSON response -- raw output: {repr(text)}"}
+
+
+def parse_json_markdown(json_string: str) -> dict:
+    # Get json from the backticks/braces
+    json_string = json_string.strip()
+    starts = ["```json", "```", "``", "`", "{"]
+    ends = ["```", "``", "`", "}"]
+    end_index = -1
+    start_index = 0
+    parsed: dict = {}
+    for s in starts:
+        start_index = json_string.find(s)
+        if start_index != -1:
+            if json_string[start_index] != "{":
+                start_index += len(s)
+            break
+    if start_index != -1:
+        for e in ends:
+            end_index = json_string.rfind(e, start_index)
+            if end_index != -1:
+                if json_string[end_index] == "}":
+                    end_index += 1
+                break
+    if start_index != -1 and end_index != -1 and start_index < end_index:
+        extracted_content = json_string[start_index:end_index].strip()
+        parsed = json.loads(extracted_content)
+    else:
+        raise ValueError("could not find json block in the output.")
+
+    return parsed
