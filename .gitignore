@@ -1,0 +1,24 @@
+# 不上传环境变量文件
+.env
+
+# 不上传 Python 缓存文件
+__pycache__/
+*.pyc
+
+# 不上传虚拟环境文件夹
+venv/
+
+# 不上传日志文件
+*.log
+
+# 不上传本地数据库或备份
+*.sql
+*.db
+
+# 不上传编辑器配置（VSCode、PyCharm）
+.vscode/
+.idea/
+
+# 不上传操作系统自动生成的隐藏文件
+.DS_Store
+Thumbs.db
