@@ -29,28 +29,19 @@ def svr_github_hook():
     author = url.split('/')[-4]
     branch = pull_request.get("head", {}).get("ref", "")
 
-    # check if the pull request is related to security
-    related_json = is_security_related(repo_name, pr_number)
-    # if not success:
-    #     logger.error(f"failed to check if pr{pr_number} is related to security")
-    #     return get_response(500, "", "is_security_related failed")
+    request_body = {
+        "filter_instruction": "",
+        "scan_instruction": "",
+        "repo_name": repo_name,
+        "pr_number": pr_number
+    }
+    logger.info(f"request body: {request_body}")
+    #NOTE security audit step: get security_result
+    resp = post_to_security_audit_srv(data=request_body)
+    security_result = resp['data']['security_audit_res']['findings']
+    
 
-    if related_json['is_security']:
-        logger.info(f"pr{pr_number} is related to security because {related_json['reason']}")
-        # call the security audit svr
-        request_body = {
-            "filter_instruction": "",
-            "scan_instruction": "",
-            "repo_name": repo_name,
-            "pr_number": pr_number
-        }
-        logger.info(f"request body: {request_body}")
-        resp = post_to_security_audit_srv(data=request_body)
-        findings = resp['data']['security_audit_res']['findings']
-        for finding in findings:
-            text_to_db += finding['category'] + ": " + finding['description'] + "\n" + finding['recommendation'] + "\n"
-        logger.info(f"extract svr response: {text_to_db}")
-    else:
-        logger.info(f"pr{pr_number} is not related to security because {related_json['reason']}")
+    #NOTE summary step: get summary_result
 
-    return get_response(200, params_dict, 'success')
+    # 存入数据库 security_result、repo_name、pr_number、action_time、author、branch
+    return get_response(200, "", 'success')
