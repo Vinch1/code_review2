@@ -7,6 +7,7 @@ from datetime import datetime
 
 from src.init_github_client import GitHubActionClient
 from src.prompts.summarize_commits_prompt import build_summarize_commits_prompt
+from src.prompts.summarize_pr_prompt import build_summarize_pr_prompt
 from utils.log import logger
 from utils.json_parser import parse_json_with_fallbacks
 
@@ -107,6 +108,95 @@ def summarize_commits(
             'since': since_iso,
             'until': until_iso,
             'summary_text': text
+        }
+
+
+def summarize_pull_request(
+    llm_client,
+    repo: str,
+    pr_number: int,
+    include_diff: bool = False,
+    max_files_for_diff: int = 20,
+    language: str = 'zh'
+) -> Dict[str, Any]:
+    """Summarize a single pull request using LLM.
+
+    Returns structured JSON when possible; otherwise returns raw text as fallback.
+    Also returns pr file-level changes for downstream usage.
+    """
+    try:
+        pr_data = github_client.get_pr_data(repo, pr_number)
+    except Exception as e:
+        logger.exception(f"Failed to fetch PR data for {repo}#{pr_number}: {e}")
+        return {
+            'repo': repo,
+            'pr_number': pr_number,
+            'error': str(e),
+            'summary_text': '',
+            'files': []
+        }
+
+    sys_prompt, user_prompt = build_summarize_pr_prompt(
+        pr_data,
+        include_diff=include_diff,
+        max_files_for_diff=max_files_for_diff,
+        language=language
+    )
+
+    ok, text, err = llm_client.call_with_retry(user_prompt, system_prompt=sys_prompt)
+    if not ok:
+        return {
+            'repo': repo,
+            'pr_number': pr_number,
+            'error': err,
+            'summary_text': '',
+            'files': [
+                {
+                    'filename': f.get('filename', ''),
+                    'status': f.get('status', ''),
+                    'additions': f.get('additions', 0),
+                    'deletions': f.get('deletions', 0),
+                }
+                for f in (pr_data.get('files') or [])
+            ]
+        }
+
+    success, parsed = parse_json_with_fallbacks(text, "LLM summarize PR")
+    if success:
+        return {
+            'repo': repo,
+            'pr_number': pr_number,
+            'summary': parsed,
+            'title': pr_data.get('title'),
+            'author': pr_data.get('user'),
+            'created_at': pr_data.get('created_at'),
+            'files': [
+                {
+                    'filename': f.get('filename', ''),
+                    'status': f.get('status', ''),
+                    'additions': f.get('additions', 0),
+                    'deletions': f.get('deletions', 0),
+                }
+                for f in (pr_data.get('files') or [])
+            ]
+        }
+    else:
+        return {
+            'repo': repo,
+            'pr_number': pr_number,
+            'summary_text': text,
+            'title': pr_data.get('title'),
+            'author': pr_data.get('user'),
+            'created_at': pr_data.get('created_at'),
+            'files': [
+                {
+                    'filename': f.get('filename', ''),
+                    'status': f.get('status', ''),
+                    'additions': f.get('additions', 0),
+                    'deletions': f.get('deletions', 0),
+                }
+                for f in (pr_data.get('files') or [])
+            ]
         }
 
 
