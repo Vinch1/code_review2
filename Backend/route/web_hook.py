@@ -46,7 +46,10 @@ def svr_github_hook():
         }
         logger.info(f"request body: {request_body}")
         resp = post_to_security_audit_srv(data=request_body)
-        logger.info(f"security audit svr response: {resp}")
+        findings = resp['data']['security_audit_res']['findings']
+        for finding in findings:
+            text_to_db += finding['category'] + ": " + finding['description'] + "\n" + finding['recommendation'] + "\n"
+        logger.info(f"extract svr response: {text_to_db}")
     else:
         logger.info(f"pr{pr_number} is not related to security because {related_json['reason']}")
 
