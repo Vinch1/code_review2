@@ -72,4 +72,21 @@ def svr_github_hook():
         'security_result': security_result,
         'summary_result': summary_result,  # 包含 files: [{filename,status,additions,deletions}]
     }
+    """
+    from db.code_review_store import CodeReviewStore
+
+    try:
+        store = CodeReviewStore()
+        store.insert_result({
+            "pr_number": pr_number,
+            "repo": repo_name,
+            "branch": branch,
+            "author": author,
+            "security_result": security_result,
+            "summary_result": summary_result
+        })
+        logger.info(f"DB write success for PR #{pr_number}")
+    except Exception as e:
+        logger.error(f"DB write failed: {e}")
+    """
     return get_response(200, resp_data, 'success')

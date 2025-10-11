@@ -4,7 +4,8 @@ sys.path.insert(0, os.path.join(pwdir, ".."))
 
 from dotenv import load_dotenv
 from utils.log import logger 
-load_dotenv()
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).parent / ".env")
 logger.info("Loaded environment variables from .env file")
 
 DEBUG = os.getenv('DEBUG', False)
