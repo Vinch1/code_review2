@@ -1,9 +1,7 @@
-from dotenv import load_dotenv
-from pathlib import Path
-load_dotenv(dotenv_path=Path(__file__).resolve().parents[1] / "settings" / ".env")
-
-import os
-import json
+import os, sys
+pwdir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(pwdir, ".."))
+from utils.log import logger
 from typing import Dict, Any, Optional
 from sqlalchemy import create_engine, Column, Integer, String, JSON, TIMESTAMP, text
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -73,6 +71,7 @@ class CodeReviewStore:
         self.db.add(obj)
         self.db.commit()
         self.db.refresh(obj)
+        logger.info(f"insert_result success: {obj.id}")
         return obj.id
 
     def get_result(self, pr_number: str) -> Optional[CodeReviewResult]:
