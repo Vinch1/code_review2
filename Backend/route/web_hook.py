@@ -9,6 +9,7 @@ from utils.common import get_response
 from utils.log import logger
 from utils.api_post import post_to_security_audit_srv
 from src.init_llm_client import LLMClient
+from db.code_review_store import CodeReviewStore
 from src.metrics.summarize_service import summarize_pull_request
 
 github_hook = Blueprint('github_hook', __name__)
@@ -72,9 +73,8 @@ def svr_github_hook():
         'security_result': security_result,
         'summary_result': summary_result,  # 包含 files: [{filename,status,additions,deletions}]
     }
-    """
-    from db.code_review_store import CodeReviewStore
-
+    logger.info(f"final resp_data: {resp_data}")
+    
     try:
         store = CodeReviewStore()
         store.insert_result({
@@ -88,5 +88,5 @@ def svr_github_hook():
         logger.info(f"DB write success for PR #{pr_number}")
     except Exception as e:
         logger.error(f"DB write failed: {e}")
-    """
+    
     return get_response(200, resp_data, 'success')

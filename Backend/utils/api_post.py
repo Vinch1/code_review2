@@ -20,7 +20,7 @@ def get_internal_ip():
 
 def post_to_security_audit_srv(data):
     # security_audit_url = 'http://'+get_internal_ip()+':8080/api/security_audit/audit_security'
-    security_audit_url = 'http://0.0.0.0:8080/api/security_audit/audit_security'
+    security_audit_url = 'http://lula-unrefusable-conventionally.ngrok-free.dev/api/security_audit/audit_security'
     headers = {'Content-Type': 'application/json', 'Accept': 'text/plain'}
     response = requests.post(security_audit_url, headers=headers, json=data)
     logger.info(f'post to {security_audit_url} response {response}')
