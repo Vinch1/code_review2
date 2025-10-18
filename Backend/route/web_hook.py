@@ -11,6 +11,8 @@ from utils.api_post import post_to_security_audit_srv
 from src.init_llm_client import LLMClient
 from db.code_review_store import CodeReviewStore
 from db.notification_outbox_repo import NotificationOutboxRepo
+from db.perform_transaction import perform_code_review_and_outbox
+from sqlalchemy.orm import Session
 from src.metrics.summarize_service import summarize_pull_request
 
 github_hook = Blueprint('github_hook', __name__)
@@ -66,37 +68,37 @@ def svr_github_hook():
 
     # 返回审计与概要信息（后续可替换为入库逻辑）
     resp_data = {
-        'repo_name': repo_name,
-        'pr_number': pr_number,
-        'action_time': action_time,
-        'author': author,
-        'branch': branch,
-        'security_result': security_result,
-        'summary_result': summary_result,  # 包含 files: [{filename,status,additions,deletions}]
+        "pr_number": int(pr_number),
+        "repo": repo_name,
+        "branch": branch,
+        "author": author,
+        "security_result": security_result,
+        "summary_result": summary_result
     }
     logger.info(f"final resp_data: {resp_data}")
     
     try:
-        store = CodeReviewStore()
-        record_id = store.insert_result({
-            "pr_number": int(pr_number),
-            "repo": repo_name,
-            "branch": branch,
-            "author": author,
-            "security_result": security_result,
-            "summary_result": summary_result
-        })
-        logger.info(f"DB write success for {repo_name}#{pr_number}, id={record_id}")
-
-        outbox = NotificationOutboxRepo()
-        outbox.insert({
-            "aggregate_type": "code_review_result",
-            "aggregate_id": record_id,
-            "status": "READY"
-        })
-        logger.info(f"Outbox write success, aggregate_type=code_review_result, aggregate_id={record_id}")
-
+        perform_code_review_and_outbox(resp_data)
     except Exception as e:
-        logger.error(f"DB write failed: {e}")
+        logger.exception(f"perform_code_review_and_outbox failed: {e}")
+        return get_response(400, "", "db error")
+                    
+
+    # try:
+        
+    #     store = CodeReviewStore()
+    #     record_id = store.insert_result(resp_data)
+
+    #     logger.info(f"DB write success for {repo_name}#{pr_number}, id={record_id}")
+
+    #     outbox = NotificationOutboxRepo()
+    #     outbox.insert(
+    #         aggregate_type="code_review_result",
+    #         aggregate_id=record_id
+    #     )
+    #     logger.info(f"Outbox write success, aggregate_type=code_review_result, aggregate_id={record_id}")
+
+    # except Exception as e:
+    #     logger.error(f"DB write failed: {e}")
     
     return get_response(200, resp_data, 'success')
