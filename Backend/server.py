@@ -14,11 +14,12 @@ app.testing = False
 from route.security_audit_route import security_audit
 from route.metrics_route import metrics
 from route.web_hook import github_hook
-
+from route.commit_route import commit_records
 
 app.register_blueprint(security_audit, url_prefix='/api/security_audit')
 app.register_blueprint(metrics, url_prefix='/api/metrics')
 app.register_blueprint(github_hook, url_prefix='/api')
+app.register_blueprint(commit_records, url_prefix='/api')
 
 
 if __name__ == '__main__':

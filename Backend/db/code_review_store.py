@@ -3,7 +3,7 @@ pwdir = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(pwdir, ".."))
 from utils.log import logger
 from typing import Dict, Any, Optional
-from sqlalchemy import create_engine, Column, Integer, String, JSON, TIMESTAMP, text
+from sqlalchemy import create_engine, Column, Integer, String, JSON, TIMESTAMP, text,  desc
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 # 连接 MySQL
@@ -76,6 +76,37 @@ class CodeReviewStore:
 
     def get_result(self, pr_number: str) -> Optional[CodeReviewResult]:
         return self.db.query(CodeReviewResult).filter_by(pr_number=str(pr_number)).first()
+
+    def query_records(self, filters: Dict[str, Any], limit: int = 50, offset: int = 0):
+        """
+        根据可选条件查询记录，按 created_at DESC 排序，支持分页
+        filters 支持的 key: pr_number, repo, branch, author
+        """
+        q = self.db.query(CodeReviewResult)
+
+        if "pr_number" in filters:
+            # 模型里 pr_number 是 Integer，这里确保转 int
+            try:
+                q = q.filter(CodeReviewResult.pr_number == int(filters["pr_number"]))
+            except Exception:
+                q = q.filter(CodeReviewResult.pr_number == filters["pr_number"])
+
+        if "repo" in filters:
+            q = q.filter(CodeReviewResult.repo == str(filters["repo"]))
+        if "branch" in filters:
+            q = q.filter(CodeReviewResult.branch == str(filters["branch"]))
+        if "author" in filters:
+            q = q.filter(CodeReviewResult.author == str(filters["author"]))
+
+        q = q.order_by(desc(CodeReviewResult.created_at))
+
+        if offset:
+            q = q.offset(int(offset))
+        if limit:
+            q = q.limit(int(limit))
+
+        return q.all()
+
 
 
 if __name__ == "__main__":
