@@ -5,25 +5,13 @@ from utils.log import logger
 from typing import Dict, Any, Optional
 from sqlalchemy import create_engine, Column, Integer, String, JSON, TIMESTAMP, text,  desc
 from sqlalchemy.orm import declarative_base, sessionmaker
+from . import make_mysql_url
 
-# 连接 MySQL
-def make_mysql_url() -> str:
-    url = os.getenv("DATABASE_URL")
-    if url:
-        return url
-    user = os.getenv("MYSQL_USER", "root")
-    pwd  = os.getenv("MYSQL_PASSWORD", "")
-    host = os.getenv("MYSQL_HOST", "127.0.0.1")
-    port = os.getenv("MYSQL_PORT", "3306")
-    db   = os.getenv("MYSQL_DB", "code_review2")
-    params = os.getenv("MYSQL_PARAMS", "charset=utf8mb4")
-    return f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{db}?{params}"
 
 DATABASE_URL = make_mysql_url()
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 Base = declarative_base()
-
 
 # ORM 模型（映射到表结构）
 class CodeReviewResult(Base):
@@ -43,10 +31,10 @@ class CodeReviewResult(Base):
 class CodeReviewStore:
     """用于写入 / 查询 code_review_results 表"""
 
-    def __init__(self):
-        # 表如果不存在则创建
+    def __init__(self, session=None):
+        self.db = session if session else SessionLocal()
         Base.metadata.create_all(engine)
-        self.db = SessionLocal()
+        # self.db = SessionLocal()
 
     def insert_result(self, data: Dict[str, Any]) -> int:
         """
@@ -69,9 +57,10 @@ class CodeReviewStore:
             summary_result=data.get("summary_result"),
         )
         self.db.add(obj)
-        self.db.commit()
-        self.db.refresh(obj)
-        logger.info(f"insert_result success: {obj.id}")
+        self.db.flush()
+        # self.db.commit()
+        # self.db.refresh(obj)
+        logger.info(f"[review] waiting to commit: {obj.id}")
         return obj.id
 
     def get_result(self, pr_number: str) -> Optional[CodeReviewResult]:

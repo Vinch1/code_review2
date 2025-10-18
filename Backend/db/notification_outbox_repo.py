@@ -6,7 +6,7 @@ from utils.log import logger
 from sqlalchemy import create_engine, Column, Integer, String, Text, TIMESTAMP, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from typing import Optional
-from db.code_review_store import make_mysql_url  # 复用原有连接逻辑
+from . import make_mysql_url
 
 DATABASE_URL = make_mysql_url()
 engine = create_engine(DATABASE_URL, pool_pre_ping=True, future=True)
@@ -34,9 +34,10 @@ class NotificationOutbox(Base):
 class NotificationOutboxRepo:
     """用于插入、更新、删除 notification_outbox 表"""
 
-    def __init__(self):
+    def __init__(self, session=None):
+        self.db = session if session else SessionLocal()
         Base.metadata.create_all(engine)
-        self.db = SessionLocal()
+        # self.db = SessionLocal()
 
     def insert(self, aggregate_type: str, aggregate_id: int):
         """
@@ -47,9 +48,10 @@ class NotificationOutboxRepo:
             aggregate_id=aggregate_id
         )
         self.db.add(obj)
-        self.db.commit()
-        self.db.refresh(obj)
-        logger.info(f"[Outbox] insert success id={obj.id}")
+        self.db.flush()
+        # self.db.commit()
+        # self.db.refresh(obj)
+        logger.info(f"[Outbox]{obj.id}")
         return obj.id
 
     def update(self, id: int, status: Optional[str] = None,
