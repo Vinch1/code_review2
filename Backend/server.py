@@ -1,5 +1,7 @@
-import os
+import os, sys
 from flask import Flask
+# Ensure Python can import the local 'settings' package when run via Flask CLI
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import settings
 app = Flask(__name__)
 # Ensure JSON responses use UTF-8 and don't escape non-ASCII characters

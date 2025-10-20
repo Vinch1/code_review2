@@ -200,6 +200,62 @@ def summarize_pull_request(
         }
 
 
+def summarize_pull_requests_batch(
+    llm_client,
+    repo: str,
+    pr_numbers: List[int],
+    include_diff: bool = False,
+    max_files_for_diff: int = 20,
+    language: str = 'zh',
+    max_workers: int = 4
+) -> Dict[str, Any]:
+    """Summarize multiple PRs concurrently using LLM.
+
+    Returns a dict with an ordered list of results aligned to the input pr_numbers.
+    Each item mirrors summarize_pull_request output.
+    """
+    # Local import fallback in case server hot-reload missed top-level import
+    try:
+        ThreadPoolExecutor  # type: ignore[name-defined]
+    except NameError:
+        from concurrent.futures import ThreadPoolExecutor  # noqa: F401
+
+    results: List[Dict[str, Any]] = [None] * len(pr_numbers)
+
+    def _run_one(idx: int, pr: int) -> None:
+        try:
+            res = summarize_pull_request(
+                llm_client,
+                repo,
+                int(pr),
+                include_diff=include_diff,
+                max_files_for_diff=max_files_for_diff,
+                language=language,
+            )
+            results[idx] = res
+        except Exception as e:
+            logger.exception(f"Batch summarize failed for PR #{pr}: {e}")
+            results[idx] = {
+                'repo': repo,
+                'pr_number': pr,
+                'error': str(e),
+            }
+
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futs = [ex.submit(_run_one, i, pr) for i, pr in enumerate(pr_numbers)]
+        for f in futs:
+            try:
+                f.result()
+            except Exception:
+                # Individual errors are already captured per task
+                pass
+
+    return {
+        'repo': repo,
+        'count': len(pr_numbers),
+        'results': results
+    }
+
 def _author_identity_from_commit(commit_obj: Dict[str, Any]) -> str:
     author = commit_obj.get('author') or {}
     login = author.get('login')
@@ -221,113 +277,3 @@ def _commit_day_label(commit_obj: Dict[str, Any]) -> str:
         return dt.strftime('%Y-%m-%d')
     except Exception:
         return 'unknown-date'
-
-
-def summarize_commits_grouped_by_author_day(
-    llm_client,
-    repo: str,
-    since_iso: str,
-    until_iso: str,
-    include_diff: bool = False,
-    max_commits_for_diff: int = 10,
-    language: str = 'zh',
-    max_groups: int = 50,
-    author: Optional[str] = None
-) -> Dict[str, Any]:
-    """Summarize commits grouped by (author, day).
-
-    Returns a dict with groups list; each group contains author, date and summary.
-    """
-    commits = github_client.list_commits(repo, since_iso, until_iso, author=author)
-
-    # Build map from SHA to original commit object (for author/date)
-    sha_to_commit: Dict[str, Dict[str, Any]] = {}
-    for c in commits:
-        sha = c.get('sha')
-        if sha:
-            sha_to_commit[sha] = c
-
-    # Fetch details
-    details: Dict[str, Dict[str, Any]] = {}
-    for c in commits:
-        sha = c.get('sha')
-        if not sha:
-            continue
-        try:
-            det = github_client.get_commit_detail(repo, sha)
-            details[sha] = det
-        except Exception as e:
-            logger.warning(f"Failed to fetch commit detail for {sha}: {e}")
-
-    # Group by (author, day)
-    from collections import defaultdict
-    grouped: Dict[tuple, list] = defaultdict(list)
-    for sha, det in details.items():
-        c = sha_to_commit.get(sha) or {}
-        author_id = _author_identity_from_commit(c)
-        day_label = _commit_day_label(c)
-        grouped[(author_id, day_label)].append(det)
-
-    # Build results per group (limit groups to avoid explosion)
-    groups_out: list = []
-    for idx, ((author_id, day_label), dets) in enumerate(grouped.items()):
-        if idx >= max_groups:
-            logger.warning(f"Group limit reached: {max_groups}")
-            break
-
-        # Order commits by size desc similar to ungrouped
-        def size_key(d):
-            files = d.get('files') or []
-            add = sum(int(f.get('additions', 0)) for f in files)
-            dele = sum(int(f.get('deletions', 0)) for f in files)
-            return add + dele
-        dets.sort(key=size_key, reverse=True)
-
-        compact = [_compact_commit_record(d) for d in dets]
-
-        context_note = f"作者：{author_id}\n日期：{day_label}"
-        sys_prompt, user_prompt = build_summarize_commits_prompt(
-            repo,
-            since_iso,
-            until_iso,
-            compact,
-            include_diff=include_diff,
-            max_commits_for_diff=max_commits_for_diff,
-            language=language,
-            context_note=context_note,
-        )
-
-        ok, text, err = llm_client.call_with_retry(user_prompt, system_prompt=sys_prompt)
-        if not ok:
-            groups_out.append({
-                'author': author_id,
-                'date': day_label,
-                'commits': [c.get('sha') for c in dets if c.get('sha')],
-                'error': err,
-                'summary_text': ''
-            })
-            continue
-
-        success, parsed = parse_json_with_fallbacks(text, "LLM summarize commits (grouped)")
-        if success:
-            groups_out.append({
-                'author': author_id,
-                'date': day_label,
-                'commits': [c.get('sha') for c in dets if c.get('sha')],
-                'summary': parsed
-            })
-        else:
-            groups_out.append({
-                'author': author_id,
-                'date': day_label,
-                'commits': [c.get('sha') for c in dets if c.get('sha')],
-                'summary_text': text
-            })
-
-    return {
-        'repo': repo,
-        'since': since_iso,
-        'until': until_iso,
-        'group_by': 'author_day',
-        'groups': groups_out
-    }

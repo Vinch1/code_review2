@@ -6,7 +6,7 @@ from utils.common import get_response
 from utils.log import logger
 from src.metrics.commit_stats_service import get_commit_stats
 from src.metrics.pr_stats_service import get_pr_stats
-from src.metrics.summarize_service import summarize_commits, summarize_commits_grouped_by_author_day
+from src.metrics.summarize_service import summarize_commits, summarize_pull_requests_batch
 from src.init_llm_client import LLMClient
 
 
@@ -64,36 +64,32 @@ def summarize_commits_api():
         return get_response(500, '', f'summarize_commits error: {str(e)}')
 
 
-@metrics.route('/summarize_commits_grouped', methods=['POST'])
-def summarize_commits_grouped_api():
+@metrics.route('/summarize_prs_batch', methods=['POST'])
+def summarize_prs_batch_api():
     body = request.get_json(silent=True) or {}
     repo = body.get('repo')
-    since = body.get('since')
-    until = body.get('until')
+    pr_numbers = body.get('pr_numbers') or []
     include_diff = bool(body.get('include_diff', False))
-    max_commits_for_diff = int(body.get('max_commits_for_diff', 10))
-    max_groups = int(body.get('max_groups', 50))
-    author = body.get('author')
+    max_files_for_diff = int(body.get('max_files_for_diff', 20))
+    max_workers = int(body.get('max_workers', 4))
 
-    if not repo or not since or not until:
-        return get_response(400, '', 'params repo/since/until are required')
+    if not repo or not isinstance(pr_numbers, list) or not pr_numbers:
+        return get_response(400, '', 'params repo (str) and pr_numbers (list) are required')
     try:
         llm_client = LLMClient()
-        data = summarize_commits_grouped_by_author_day(
+        data = summarize_pull_requests_batch(
             llm_client,
             repo,
-            since,
-            until,
+            [int(p) for p in pr_numbers],
             include_diff=include_diff,
-            max_commits_for_diff=max_commits_for_diff,
+            max_files_for_diff=max_files_for_diff,
             language='zh',
-            max_groups=max_groups,
-            author=author
+            max_workers=max_workers
         )
         return get_response(200, data, 'success')
     except Exception as e:
-        logger.exception(f"summarize_commits_grouped failed: {e}")
-        return get_response(500, '', f'summarize_commits_grouped error: {str(e)}')
+        logger.exception(f"summarize_prs_batch failed: {e}")
+        return get_response(500, '', f'summarize_prs_batch error: {str(e)}')
 @metrics.route('/pr_stats', methods=['GET'])
 def get_pr_stats_api():
     repo = request.args.get('repo')
