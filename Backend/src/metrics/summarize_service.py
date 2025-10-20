@@ -136,6 +136,12 @@ def summarize_pull_request(
             'files': []
         }
 
+    # Aggregate additions/deletions from filtered files for this PR
+    pr_files = pr_data.get('files') or []
+    total_additions = sum(int(f.get('additions', 0)) for f in pr_files)
+    total_deletions = sum(int(f.get('deletions', 0)) for f in pr_files)
+    net_lines = total_additions - total_deletions
+
     sys_prompt, user_prompt = build_summarize_pr_prompt(
         pr_data,
         include_diff=include_diff,
@@ -150,6 +156,9 @@ def summarize_pull_request(
             'pr_number': pr_number,
             'error': err,
             'summary_text': '',
+            'additions_total': total_additions,
+            'deletions_total': total_deletions,
+            'net_lines': net_lines,
             'files': [
                 {
                     'filename': f.get('filename', ''),
@@ -170,6 +179,9 @@ def summarize_pull_request(
             'title': pr_data.get('title'),
             'author': pr_data.get('user'),
             'created_at': pr_data.get('created_at'),
+            'additions_total': total_additions,
+            'deletions_total': total_deletions,
+            'net_lines': net_lines,
             'files': [
                 {
                     'filename': f.get('filename', ''),
@@ -188,6 +200,9 @@ def summarize_pull_request(
             'title': pr_data.get('title'),
             'author': pr_data.get('user'),
             'created_at': pr_data.get('created_at'),
+            'additions_total': total_additions,
+            'deletions_total': total_deletions,
+            'net_lines': net_lines,
             'files': [
                 {
                     'filename': f.get('filename', ''),
