@@ -1,0 +1,1 @@
+export const WEBHOOK_URL = "http://39.97.170.225:80/api/github_hook";
