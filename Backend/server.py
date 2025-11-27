@@ -24,7 +24,8 @@ app.register_blueprint(github_hook, url_prefix='/api')
 app.register_blueprint(commit_records, url_prefix='/api')
 
 
-from ..feishu.outbox_poller import start_outbox_poller
+sys.path.append('..')
+from feishu.outbox_poller import start_outbox_poller
 _stop_feishu = start_outbox_poller(interval_sec=15, batch_size=10)
 
 if __name__ == '__main__':

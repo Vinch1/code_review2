@@ -7,8 +7,8 @@
 import logging, threading, time
 from datetime import datetime, timedelta
 from typing import List, Optional
-from ..Backend.db.code_review_store import CodeReviewResult, SessionLocal as ReviewSession
-from ..Backend.db.notification_outbox_repo import (
+from Backend.db.code_review_store import CodeReviewResult, SessionLocal as ReviewSession
+from Backend.db.notification_outbox_repo import (
     NotificationOutbox, SessionLocal as OutboxSession, NotificationOutboxRepo
 )
 

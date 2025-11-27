@@ -1,7 +1,7 @@
 # feishu_demo/sender.py
 import base64, hashlib, hmac, json, time, requests
 from typing import Optional, Dict, Any
-import Config as C
+from . import Config as C
 
 class FeishuSender:
     def __init__(self, url: str, secret: Optional[str] = None, timeout_sec: int = 6):
